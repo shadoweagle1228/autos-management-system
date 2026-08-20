@@ -48,7 +48,8 @@ public class AutoServiceTest {
     // --- TEST 1: Crear Auto ---
     @Test
     void createAuto_ShouldAssignUserAndDefaultPhoto() {
-        // Arrange: Le decimos al mock qué responder
+        when(autoRepositoryPort.existsByPlate(sampleAuto.getPlate())).thenReturn(false); 
+        
         when(autoRepositoryPort.save(any(Auto.class))).thenReturn(sampleAuto);
 
         // Act: Ejecutamos el método real
@@ -56,9 +57,9 @@ public class AutoServiceTest {
 
         // Assert: Verificamos que la lógica de negocio funcionó
         assertNotNull(createdAuto);
-        assertEquals(USER_ID, createdAuto.getUserId()); // Validamos que se asignó el usuario
-        assertEquals("simulated_photo_url.jpg", sampleAuto.getPhoto()); // Validamos la foto por defecto
-        verify(autoRepositoryPort, times(1)).save(sampleAuto); // Validamos que se llamó al repositorio
+        assertEquals(USER_ID, createdAuto.getUserId()); 
+        assertEquals("simulated_photo_url.jpg", sampleAuto.getPhoto()); 
+        verify(autoRepositoryPort, times(1)).save(sampleAuto); 
     }
 
     // --- TEST 2: Buscar Auto Exitoso ---
@@ -104,5 +105,23 @@ public class AutoServiceTest {
         assertFalse(autos.isEmpty());
         assertEquals(1, autos.size());
         verify(autoRepositoryPort, times(1)).findByUserId(USER_ID);
+    }
+
+    @Test
+    void createAuto_ShouldThrowException_WhenPlateAlreadyExists() {
+        when(autoRepositoryPort.existsByPlate(sampleAuto.getPlate())).thenReturn(true);
+
+        // Act & Assert: Verificamos que lance un ResponseStatusException
+        org.springframework.web.server.ResponseStatusException exception = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class, () -> {
+            autoService.createAuto(sampleAuto, USER_ID);
+        });
+        
+        // Verificamos que el error sea 400 Bad Request
+        assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertTrue(exception.getReason().contains("La placa ya está registrada"));
+        
+        // Verificamos que NUNCA haya intentado guardar el auto
+        verify(autoRepositoryPort, never()).save(any(Auto.class));
     }
 }
